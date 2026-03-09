@@ -66,70 +66,67 @@ text-decoration:none;
 
 <div class="link">
 Already have account?
-<a href="login.html">Login</a>
+
+
 </div></div>
 
-<script>
-
-async function register(){
-
-let btn = event.target
-btn.disabled = true
-btn.innerText = "Registering..."
-
-let username = document.getElementById("username").value.trim()
-let email = document.getElementById("email").value.trim()
-let password = document.getElementById("password").value.trim()
-let referral = document.getElementById("referral").value.trim()
-
-try{
-
-let res = await fetch("/register",{
-method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({
-username,
-email,
-password,
-referral
-})
-})
-
-let data = await res.json()
-
-/* SUCCESS → DIRECT REDIRECT */
-if(data.status === "success"){
-
-localStorage.setItem("verifyEmail", email)
-window.location.href = "verify.html"
-
-}else{
-
-/* ERROR ONLY → SHOW ALERT */
-alert(data.message || "Registration failed")
-
-}
-
-}catch(err){
-
-console.log(err)
-alert("Server error. Try again later.")
-
-}
-
-btn.disabled = false
-btn.innerText = "Register"
-
-}
-
-</script>
 
 <script>
+async function register(event) {
+  let btn = event.target
+  btn.disabled = true
+  btn.innerText = "Registering..."
+
+  // Get form values
+  let username = document.getElementById("username").value.trim()
+  let email = document.getElementById("email").value.trim()
+  let password = document.getElementById("password").value.trim()
+  let referralInput = document.getElementById("referral").value.trim()
+
+  try {
+    // Fetch API to Railway backend
+    let res = await fetch("https://nexshares-production.up.railway.app/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username,
+        email,
+        password,
+        referral: referralInput || null
+      })
+    })
+
+    let data = await res.json()
+    console.log("Register API response:", data)
+
+    // SUCCESS → redirect to verification
+    if (data.status === "success") {
+      localStorage.setItem("verifyEmail", email)
+      window.location.href = "verify.html"
+    } else {
+      // ERROR → show message
+      alert(data.message || "Registration failed")
+    }
+
+  } catch (err) {
+    console.error("Frontend registration error:", err)
+    alert("Server error. Please try again later.")
+  } finally {
+    // ALWAYS reset button state
+    btn.disabled = false
+    btn.innerText = "Register"
+  }
+}
+
+// Pre-fill referral code from URL query if present
 const params = new URLSearchParams(window.location.search)
 let referral = params.get("ref") || null
+if (referral) {
+  let refInput = document.getElementById("referral")
+  if (refInput) refInput.value = referral
+}
 </script>
+
 
 </body>
 </html>

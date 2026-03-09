@@ -1,179 +1,153 @@
-require("dotenv").config()
+require("dotenv").config();
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const User = require("./models/User");
+const Deposit = require("./models/Deposit");
+const Withdrawal = require("./models/Withdrawal");
+const { Resend } = require("resend")
 
-const express = require("express")
-const mongoose = require("mongoose")
-const cors = require("cors")
-const jwt = require("jsonwebtoken")
-const bcrypt = require("bcryptjs")
-const User = require("./models/User")
-const Deposit = require("./models/Deposit")
-const nodemailer = require("nodemailer")
-const Withdrawal = require("./models/Withdrawal")
+const resend = new Resend(process.env.RESEND_API_KEY)
 
-const app = express()
-const authMiddleware = require("./middleware/authMiddleware")
+const app = express();
+const authMiddleware = require("./middleware/authMiddleware");
 
-const transporter = nodemailer.createTransport({
-service:"gmail",
-auth:{
-user:process.env.EMAIL_USER,
-pass:process.env.EMAIL_PASS
-}
-})
+// ======== Email transporter ========
 
-function adminGuard(req,res,next){
+app.use(express.json());
 
-const token = req.headers.authorization?.split(" ")[1]
+// ======== Logging all requests ========
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url} | Body:`, req.body);
+  next();
+});
 
-if(!token){
-return res.redirect("/login.html")
-}
+app.use(express.json());
+app.use(cors({
+  origin: "https://nexshares-production.up.railway.app", // your live frontend
+  credentials: true
+}));
 
-try{
-
-const decoded = jwt.verify(token,process.env.JWT_SECRET)
-
-if(decoded.email !== "nexshares@gmail.com"){
-return res.redirect("/login.html")
-}
-
-next()
-
-}catch(err){
-return res.redirect("/login.html")
-}
-
-}
-
-function generateCode(){
-return Math.floor(100000 + Math.random()*900000).toString()
-}  
-
- 
-app.use(express.json())
-app.use(cors())
-
+// ======== MongoDB connection ========
 mongoose.connect(process.env.MONGO_URI)
-.then(()=>console.log("MongoDB Connected"))
-.catch(err=>console.log(err))
+  .then(() => console.log("MongoDB Connected"))
+  .catch(err => console.log("MongoDB Connection Error:", err));
 
-app.use(express.static("public"))
+app.use(express.static("public"));
 
-app.get("/",(req,res)=>{
-res.sendFile(__dirname+"/public/index.html")
-})
+// ======== Home page ========
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/public/index.html");
+});
 
-const PORT = 5000
-
-app.listen(PORT,()=>{
-console.log("Server running on port "+PORT)
-})
+// ======== Start Server ========
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, "0.0.0.0", () => console.log("Server running on port " + PORT));
 
 
-/* REGISTER API */
+/* REGISTER API — PROFESSIONAL VERSION WITH LOGGING */
 
-app.post("/register", async (req,res)=>{
+app.post("/register", async (req, res) => {
+  console.log("=== REGISTER ROUTE HIT ===") // Step 0
 
-function generateReferralCode(){
-return "NX" + Math.random().toString(36).substring(2,8).toUpperCase()
-}
+  // Helper function
+  function generateReferralCode() {
+    return "NX" + Math.random().toString(36).substring(2, 8).toUpperCase()
+  }
 
-try{
+  try {
+    const { username, email, password, referral } = req.body
+    console.log("Received data:", { username, email, password, referral }) // Step 1
 
-const { username,email,password,referral } = req.body
+    // Validate required fields
+    if (!username || !email || !password) {
+      console.log("Missing fields")
+      return res.json({ status: "error", message: "All fields are required" })
+    }
 
-let existingUser = await User.findOne({email})
+    // Check if user already exists
+    let existingUser = await User.findOne({ email })
+    console.log("Existing user check:", existingUser)
+    if (existingUser) {
+      console.log("User already exists")
+      return res.json({ status: "error", message: "User already exists" })
+    }
 
-if(existingUser){
-return res.json({
-status:"error",
-message:"User already exists"
-})
-}
+    // Validate referral code
+    let referredBy = null
+    if (referral) {
+      let refUser = await User.findOne({ referralCode: referral })
+      if (refUser) {
+        referredBy = referral
+        console.log("Valid referral found:", referral)
+      } else {
+        console.log("Referral code invalid:", referral)
+      }
+    }
 
-/* CHECK REFERRAL CODE VALIDITY */
+    // Generate verification code
+    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    console.log("Verification code generated:", code)
 
-let referredBy = null
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10)
+    console.log("Password hashed")
 
-if(referral){
+    // Create new user
+    const user = new User({
+      username,
+      email,
+      password: hashedPassword,
+      verificationCode: code,
+      codeExpiry: new Date(Date.now() + 15 * 60 * 1000), // 15 min expiry
+      verified: false,
+      referralCode: generateReferralCode(),
+      referredBy: referredBy,
+      referralCommission: 0,
+      referralCount: 0,
+      balance: 0
+    })
 
-let refUser = await User.findOne({
-referralCode:referral
-})
+    await user.save()
+    console.log("User saved in MongoDB")
 
-if(refUser){
-referredBy = referral
-}
+    // Update referral count
+    if (referredBy) {
+      const refUser = await User.findOne({ referralCode: referredBy })
+      if (refUser) {
+        refUser.referralCount = (refUser.referralCount || 0) + 1
+        await refUser.save()
+        console.log("Referral count updated for:", referredBy)
+      }
+    }
 
-}
-
-/* GENERATE OTP */
-
-const code = Math.floor(100000 + Math.random()*900000).toString()
-
-let hashedPassword = await bcrypt.hash(password,10)
-
-/* CREATE USER */
-
-const user = new User({
-username,
-email,
-password:hashedPassword,
-verificationCode:code,
-codeExpiry:new Date(Date.now() + 15*60*1000),
-verified:false,
-referralCode:generateReferralCode(),
-referredBy:referredBy,
-referralCommission:0,
-referralCount:0,
-balance:0
-})
-
-await user.save()
-
-/* INCREASE REFERRAL COUNT */
-
-if(referredBy){
-
-const refUser = await User.findOne({ referralCode: referredBy })
-
-if(refUser){
-
-refUser.referralCount = (refUser.referralCount || 0) + 1
-
-await refUser.save()
-
-}
-
-}
-
-/* SEND EMAIL */
-
-await transporter.sendMail({
-from:process.env.EMAIL_USER,
-to:email,
-subject:"NexShares Verification Code",
-text:`Your verification code is ${code}`
-})
-
-res.json({
-status:"success",
-message:"Registration successful. Verify your email."
-})
-
-}catch(err){
-
-console.log(err)
-
-res.json({
-status:"error",
-message:"Server error"
-})
-
-}
+await resend.emails.send({
+  from: "NexShares <onboarding@resend.dev>",
+  to: email,
+  subject: "NexShares Verification Code",
+  text: `Your NexShares verification code is ${code}`
 
 })
 
+    console.log("Verification email sent to:", email)
+    
+    // ✅ Respond to frontend
+    res.json({
+      status: "success",
+      message: "Registration successful. Verify your email."
+    })
+    console.log("Response sent")
+
+  } catch (err) {
+    console.error("ERROR IN REGISTER ROUTE:", err)
+    res.json({
+      status: "error",
+      message: "Server error"
+    })
+  }
+})
 
 /* VERIFICATION ROUTE */
 
