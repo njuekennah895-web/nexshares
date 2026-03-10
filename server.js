@@ -49,60 +49,45 @@ app.listen(PORT, "0.0.0.0", () => console.log("Server running on port " + PORT))
 
 /* REGISTER API — PROFESSIONAL VERSION WITH LOGGING */
 
-app.post("/register", async (req, res) => {
-  console.log("=== REGISTER ROUTE HIT ===") // Step 0
 
-  // Helper function
+
+app.post("/register", async (req, res) => {
+  console.log("=== REGISTER ROUTE HIT ===")
+
   function generateReferralCode() {
     return "NX" + Math.random().toString(36).substring(2, 8).toUpperCase()
   }
 
   try {
-    const { username, email, password, referral } = req.body
-    console.log("Received data:", { username, email, password, referral }) // Step 1
 
-    // Validate required fields
+    const { username, email, password, referral } = req.body
+
     if (!username || !email || !password) {
-      console.log("Missing fields")
       return res.json({ status: "error", message: "All fields are required" })
     }
 
-    // Check if user already exists
     let existingUser = await User.findOne({ email })
-    console.log("Existing user check:", existingUser)
+
     if (existingUser) {
-      console.log("User already exists")
       return res.json({ status: "error", message: "User already exists" })
     }
 
-    // Validate referral code
     let referredBy = null
+
     if (referral) {
       let refUser = await User.findOne({ referralCode: referral })
       if (refUser) {
         referredBy = referral
-        console.log("Valid referral found:", referral)
-      } else {
-        console.log("Referral code invalid:", referral)
       }
     }
 
-    // Generate verification code
-    const code = Math.floor(100000 + Math.random() * 900000).toString()
-    console.log("Verification code generated:", code)
-
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
-    console.log("Password hashed")
 
-    // Create new user
     const user = new User({
       username,
       email,
       password: hashedPassword,
-      verificationCode: code,
-      codeExpiry: new Date(Date.now() + 15 * 60 * 1000), // 15 min expiry
-      verified: false,
+      verified: true,
       referralCode: generateReferralCode(),
       referredBy: referredBy,
       referralCommission: 0,
@@ -111,43 +96,34 @@ app.post("/register", async (req, res) => {
     })
 
     await user.save()
-    console.log("User saved in MongoDB")
 
-    // Update referral count
     if (referredBy) {
       const refUser = await User.findOne({ referralCode: referredBy })
       if (refUser) {
         refUser.referralCount = (refUser.referralCount || 0) + 1
         await refUser.save()
-        console.log("Referral count updated for:", referredBy)
       }
     }
 
-await resend.emails.send({
-  from: "NexShares <onboarding@resend.dev>",
-  to: email,
-  subject: "NexShares Verification Code",
-  text: `Your NexShares verification code is ${code}`
-
-})
-
-    console.log("Verification email sent to:", email)
-    
-    // ✅ Respond to frontend
     res.json({
       status: "success",
-      message: "Registration successful. Verify your email."
+      message: "Registration successful"
     })
-    console.log("Response sent")
 
   } catch (err) {
-    console.error("ERROR IN REGISTER ROUTE:", err)
+
+    console.error("REGISTER ERROR:", err)
+
     res.json({
       status: "error",
       message: "Server error"
     })
+
   }
 })
+
+
+
 
 /* VERIFICATION ROUTE */
 
@@ -229,8 +205,8 @@ message:"Verification failed"
 
 })
 
-/*RESEND CODE API*/
-
+/*RESEND CODE API/
+                  
 
 app.post("/resend-code", async(req,res)=>{
 
@@ -270,7 +246,7 @@ console.log(err)
 res.json({status:"error"})
 }
 
-})
+})*/
 
 /* LOGIN API */
 
@@ -336,8 +312,8 @@ message:"Server error"
 
 })
 
-/* VERIFY EMAIL CODE */
-
+/* VERIFY EMAIL CODE /
+                      
 app.post("/verify-code", async (req,res)=>{
 
 try{
@@ -353,7 +329,7 @@ message:"User not found"
 })
 }
 
-/* check code */
+/* check code *
 
 if(user.verificationCode !== code){
 return res.json({
@@ -362,8 +338,8 @@ message:"Invalid code"
 })
 }
 
-/* check expiry */
-
+/* check expiry /
+                 
 if(new Date() > user.codeExpiry){
 return res.json({
 status:"error",
@@ -371,7 +347,7 @@ message:"Code expired"
 })
 }
 
-/* verify user */
+/* verify user *
 
 user.verified = true
 user.verificationCode = null
@@ -394,7 +370,7 @@ status:"error"
 
 })
 
-
+                   
 /* DEPOSIT REQUEST API */
 
 app.post("/deposit", async (req,res)=>{
@@ -1240,16 +1216,13 @@ message:"Server error"
 
 });
 
-
-/* FORGOT PASSWORD REQUEST */
+/*FORGOT PASSWORD API*/
 
 app.post("/forgot-password", async (req,res)=>{
 
-try{
+const {email,newPassword} = req.body
 
-const { email } = req.body
-
-let user = await User.findOne({email})
+const user = await User.findOne({email})
 
 if(!user){
 return res.json({
@@ -1258,35 +1231,21 @@ message:"User not found"
 })
 }
 
-/* Generate reset code */
+const hashedPassword = await bcrypt.hash(newPassword,10)
 
-const resetCode = Math.floor(100000 + Math.random()*900000).toString()
-
-user.verificationCode = resetCode
-user.codeExpiry = new Date(Date.now() + 15*60*1000)
+user.password = hashedPassword
 
 await user.save()
 
-await transporter.sendMail({
-from:process.env.EMAIL_USER,
-to:email,
-subject:"Password Reset Code",
-text:`Your password reset code is ${resetCode}`
-})
-
 res.json({
 status:"success",
-message:"Reset code sent to email"
+message:"Password reset successful"
 })
-
-}catch(err){
-console.log(err)
-res.json({status:"error"})
-}
 
 })
 
-/*VERIFY RESET CODE API*/
+                        
+/*VERIFY RESET CODE API/
 
 app.post("/verify-reset-code", async (req,res)=>{
 

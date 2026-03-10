@@ -18,28 +18,13 @@ type:String,
 required:true
 },
 
-verificationCode:String,
-codeExpiry:Date,
-
 verified:{
 type:Boolean,
-default:false
+default:true
 },
 
-balance:{
-type:Number,
-default:0
-},
-
-referralCode:{
-type:String,
-unique:true
-},
-
-referredBy:{
-type:String,
-default:null
-},
+referralCode:String,
+referredBy:String,
 
 referralCommission:{
 type:Number,
@@ -50,30 +35,23 @@ referralCount:{
 type:Number,
 default:0
 },
-teamLevel:{
+
+balance:{
 type:Number,
 default:0
 },
 
-activePackage:String,
-
-shares:{
-type:Number,
-default:0
-},
-
-dailyProfit:{
-type:Number,
-default:0
-},
-
-packageDuration:{
-type:Number,
-default:0
-},
+shares:Number,
+dailyProfit:Number,
+packageDuration:Number,
 
 packageStartDate:Date,
-lastProfitUpdate:Date
+lastProfitUpdate:Date,
+
+totalProfitEarned:{
+type:Number,
+default:0
+}
 
 })
 
