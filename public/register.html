@@ -62,8 +62,13 @@ color:#f3ba2f;
 text-decoration:none;
 }
 
-</style></head><body><div class="container"><h2>Create Account</h2><input id="username" placeholder="Username"><input id="email" placeholder="Email"><input id="password" type="password" placeholder="Password"><input id="referral" placeholder="Referral Code (Optional)"><button onclick="register()">Register</button>
-
+</style></head><body><div class="container"><h2>Create Account</h2>
+<input id="username" placeholder="Username">
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<input id="referral" placeholder="Referral Code (Optional)">
+<button id="registerBtn">Register</button>
+                                                                                                                                                                                                                                                                             
 <div class="link">
 Already have account?
 
@@ -72,6 +77,9 @@ Already have account?
 
 
 <script>
+document.getElementById("registerBtn").addEventListener("click", register);
+
+
 async function register(event) {
   let btn = event.target
   btn.disabled = true
@@ -85,7 +93,8 @@ async function register(event) {
 
   try {
     // Fetch API to Railway backend
-    let res = await fetch("https://nexshares-production.up.railway.app/register", {
+    let res =
+await fetch("http://localhost:5000/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

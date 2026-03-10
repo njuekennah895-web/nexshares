@@ -103,6 +103,13 @@ app.post("/register", async (req, res) => {
       balance: 0
     })
 
+await transporter.sendMail({
+from:process.env.EMAIL_USER,
+to:email,
+subject:"NexShares Verification Code",
+text:`Your new verification code is ${code}`
+})
+
     await user.save()
 
     if (referredBy) {
@@ -213,7 +220,7 @@ message:"Verification failed"
 
 })
 
-/*RESEND CODE API/
+/*RESEND CODE API*/
                   
 
 app.post("/resend-code", async(req,res)=>{
@@ -320,7 +327,7 @@ message:"Server error"
 
 })
 
-/* VERIFY EMAIL CODE /
+/* VERIFY EMAIL CODE */
                       
 app.post("/verify-code", async (req,res)=>{
 
@@ -337,7 +344,7 @@ message:"User not found"
 })
 }
 
-/* check code *
+/* check code */
 
 if(user.verificationCode !== code){
 return res.json({
@@ -346,7 +353,7 @@ message:"Invalid code"
 })
 }
 
-/* check expiry /
+/* check expiry */
                  
 if(new Date() > user.codeExpiry){
 return res.json({
@@ -355,7 +362,7 @@ message:"Code expired"
 })
 }
 
-/* verify user *
+/* verify user */
 
 user.verified = true
 user.verificationCode = null
@@ -1253,7 +1260,7 @@ message:"Password reset successful"
 })
 
                         
-/*VERIFY RESET CODE API/
+/*VERIFY RESET CODE API*/
 
 app.post("/verify-reset-code", async (req,res)=>{
 
