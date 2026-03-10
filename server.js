@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const morgan = require("morgan"); 
 const mongoose = require("mongoose");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
@@ -49,6 +50,9 @@ app.listen(PORT, "0.0.0.0", () => console.log("Server running on port " + PORT))
 app.get("/", (req, res) => {
   res.send("NexShares API is running")
 })
+
+app.use(morgan("dev")); // Logs all requests in 'dev' format
+app.use(express.json()); // Keep your JSON parser
 
 
 /* REGISTER API — PROFESSIONAL VERSION WITH LOGGING */
