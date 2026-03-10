@@ -9,11 +9,28 @@ const User = require("./models/User");
 const Deposit = require("./models/Deposit");
 const Withdrawal = require("./models/Withdrawal");
 const { Resend } = require("resend")
+const nodemailer = require("nodemailer");
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 const app = express();
 const authMiddleware = require("./middleware/authMiddleware");
+
+const transporter = nodemailer.createTransport({
+  service: "Gmail",
+  auth: {
+    user: process.env.EMAIL_USER, // set in your .env
+    pass: process.env.EMAIL_PASS  // set in your .env
+  }
+});
+
+
+// Resend instance (optional)
+
+
+// Conditional flag
+const USE_RESEND = !!process.env.RESEND_API_KEY;
+
 
 // ======== Email transporter ========
 
@@ -102,15 +119,37 @@ app.post("/register", async (req, res) => {
       referralCount: 0,
       balance: 0
     })
-
-await transporter.sendMail({
-from:process.env.EMAIL_USER,
-to:email,
-subject:"NexShares Verification Code",
-text:`Your new verification code is ${code}`
-})
-
+    const code = Math.floor(100000 + Math.random() * 900000); // 6-digit code
+    user.verificationCode = code; // save code in MongoDB
+    user.codeExpiry = new Date(Date.now() + 15 * 60 * 1000); // expires in 15 minutes
     await user.save()
+
+
+  // === Conditional Email Sending ===
+    try {
+      if (USE_RESEND && resend) {
+        // Use Resend if API key exists
+        await resend.emails.send({
+          from: "noreply@yourdomain.com",
+          to: email,
+          subject: "NexShares Verification Code",
+          text: `Your new verification code is ${code}`,
+        });
+      } else {
+        // Fallback to Nodemailer transporter
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: email,
+          subject: "NexShares Verification Code",
+          text: `Your new verification code is ${code}`,
+        });
+      }
+    } catch (emailErr) {
+      console.error("Email sending error:", emailErr);
+      // Do NOT fail registration if email fails
+    }
+
+
 
     if (referredBy) {
       const refUser = await User.findOne({ referralCode: referredBy })
@@ -242,12 +281,31 @@ user.codeExpiry = new Date(Date.now()+15*60*1000)
 
 await user.save()
 
-await transporter.sendMail({
-from:process.env.EMAIL_USER,
-to:email,
-subject:"NexShares Verification Code",
-text:`Your new verification code is ${code}`
-})
+  // === Conditional Email Sending ===
+    try {
+      if (USE_RESEND && resend) {
+        // Use Resend if API key exists
+        await resend.emails.send({
+          from: "noreply@yourdomain.com",
+          to: email,
+          subject: "NexShares Verification Code",
+          text: `Your new verification code is ${code}`,
+        });
+      } else {
+        // Fallback to Nodemailer transporter
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: email,
+          subject: "NexShares Verification Code",
+          text: `Your new verification code is ${code}`,
+        });
+      }
+    } catch (emailErr) {
+      console.error("Email sending error:", emailErr);
+      // Do NOT fail registration if email fails
+    }
+
+
 
 res.json({
 status:"success",
@@ -261,7 +319,7 @@ console.log(err)
 res.json({status:"error"})
 }
 
-})*/
+})
 
 /* LOGIN API */
 
